@@ -1,0 +1,17 @@
+[
+  {
+    "nome": "Camiseta Azul",
+    "preco": 50,
+    "imagem": "https://via.placeholder.com/220"
+  },
+  {
+    "nome": "Boné Azul",
+    "preco": 30,
+    "imagem": "https://via.placeholder.com/220"
+  },
+  {
+    "nome": "Tênis Branco",
+    "preco": 120,
+    "imagem": "https://via.placeholder.com/220"
+  }
+]
