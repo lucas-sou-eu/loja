@@ -1,0 +1,181 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Vitrine Loja — WhatsApp</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f7f8fa; --card:#fff; --accent:#25D366; --muted:#6b7280;
+}
+*{box-sizing:border-box;}
+body{font-family:Inter,system-ui,Arial;margin:0;background:linear-gradient(180deg,#f8fbf8,var(--bg));color:#0f172a;position:relative;}
+header{display:flex;flex-direction:column;gap:8px;padding:16px;border-bottom:1px solid rgba(0,0,0,0.05);background:var(--card);}
+header .logo{font-weight:700;color:var(--accent);font-size:20px;}
+#search{padding:10px 12px;border-radius:10px;border:1px solid #e6e9ee;width:100%; max-width:400px;}
+
+.container{padding:20px; max-width:1100px; margin:0 auto;}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px; flex-wrap:wrap; gap:6px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;}
+.card{background:var(--card);padding:14px;border-radius:12px;box-shadow:0 6px 18px rgba(12,15,20,0.06);display:flex;flex-direction:column;gap:8px;transition:transform .12s;}
+.card:hover{transform:translateY(-6px);}
+.thumb{height:150px;border-radius:8px;background:#f0f2f5;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.thumb img{width:100%;height:100%;object-fit:cover;}
+h3{margin:0;font-size:16px;}
+.price{color:var(--muted);font-weight:600;}
+.add{margin-top:auto;padding:10px;border-radius:10px;border:0;background:var(--accent);color:#fff;font-weight:700;cursor:pointer;transition:transform .15s;}
+.add:active{transform:scale(1.1);}
+.badge{background:#111827;color:#fff;padding:6px 10px;border-radius:10px;font-weight:700;position:relative;transition:transform .15s;cursor:pointer;}
+.badge.animate{transform:scale(1.3);}
+.finalizar{background:var(--accent);border:0;color:#fff;padding:10px 14px;border-radius:10px;font-weight:800;cursor:pointer;white-space:nowrap;}
+
+/* Carrinho drawer top-right */
+#cartPreview{
+  position:fixed; top:20px; right:20px; width:320px; max-height:80%; background:var(--card); border-radius:14px; padding:12px; box-shadow:0 12px 30px rgba(12,15,20,0.08);
+  overflow:auto; opacity:0; transform:translateY(-20px) translateX(20px); transition:all .3s ease; pointer-events:none; z-index:100; touch-action: pan-y;
+}
+#cartPreview.show{opacity:1; transform:translateY(0) translateX(0); pointer-events:auto;}
+.cart-item{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed rgba(0,0,0,0.03);}
+.qtybtn{background:var(--accent);border:none;color:#fff;padding:6px 8px;border-radius:8px;cursor:pointer;margin:0 4px;}
+.small{font-size:13px;color:var(--muted);}
+
+/* overlay */
+#overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.2);opacity:0;pointer-events:none;transition:all .3s; z-index:90;}
+#overlay.show{opacity:1; pointer-events:auto;}
+
+/* MOBILE ADAPTIVE */
+@media(max-width:520px){
+  .grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px;}
+  #cartPreview{width:90%; right:5%; top:10%; max-height:80%; border-radius:16px;}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🛍️ Loja do Mestre</div>
+  <input id="search" placeholder="Buscar produto" />
+</header>
+
+<main class="container">
+  <div class="top">
+    <div><strong id="countText">0</strong> produtos</div>
+    <div class="small"></div>
+  </div>
+  <div id="grid" class="grid"></div>
+</main>
+
+<!-- Carrinho badge -->
+<div style="position:fixed;top:20px; right:20px; z-index:101; display:flex; gap:8px;">
+  <div id="cartBtn" class="badge" onclick="togglePreview()">🛒 <span id="totalQty">0</span></div>
+  <button onclick="finalizar()" class="finalizar">Finalizar</button>
+</div>
+
+<!-- overlay -->
+<div id="overlay" onclick="togglePreview()"></div>
+
+<!-- carrinho drawer -->
+<div id="cartPreview">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <strong>Seu carrinho</strong>
+    <button onclick="clearCart()" style="background:transparent;border:0;color:var(--muted);cursor:pointer">Limpar</button>
+  </div>
+  <div id="cartList"></div>
+  <div style="margin-top:8px;text-align:right">
+    <div class="small">Total</div>
+    <div style="font-weight:800">R$ <span id="totalPreview">0</span></div>
+  </div>
+</div>
+
+<script>
+let produtos=[], carrinho=[];
+
+async function load(){
+  try{
+    const res = await fetch('./produtos.json');
+    produtos = await res.json();
+    renderCatalog(produtos);
+  }catch(e){
+    console.error('Erro carregando produtos', e);
+    document.getElementById('grid').innerHTML = '<div style="grid-column:1/-1;padding:20px">Não foi possível carregar produtos.</div>';
+  }
+}
+
+function renderCatalog(list){
+  const grid=document.getElementById('grid'); grid.innerHTML='';
+  list.forEach(p=>{
+    const div=document.createElement('div'); div.className='card';
+    div.innerHTML=`<div class="thumb"><img src="${p.imagem}" alt="${p.nome}" onerror="this.src='https://via.placeholder.com/300'"></div>
+      <h3>${p.nome}</h3>
+      <button class="add" onclick="addToCart('${escapeHtml(p.nome)}',${p.preco})">Adicionar</button>`;
+    grid.appendChild(div);
+  });
+  document.getElementById('countText').innerText=list.length;
+}
+
+function escapeHtml(s){ return s.replace(/'/g,"\\'").replace(/"/g,'\\"'); }
+
+function addToCart(nome,preco){
+  const item=carrinho.find(i=>i.nome===nome);
+  if(item) item.qtd++; else carrinho.push({nome,preco,qtd:1});
+  renderCart();
+  const btn=document.getElementById('cartBtn'); btn.classList.add('animate'); setTimeout(()=>btn.classList.remove('animate'),200);
+}
+
+function atualizar(nome,delta){
+  const it=carrinho.find(i=>i.nome===nome); if(!it)return;
+  it.qtd+=delta; if(it.qtd<=0)carrinho=carrinho.filter(x=>x.nome!==nome);
+  renderCart();
+}
+
+function renderCart(){
+  const cartList=document.getElementById('cartList'); cartList.innerHTML='';
+  let total=0,qty=0;
+  carrinho.forEach(i=>{
+    total+=i.preco*i.qtd; qty+=i.qtd;
+    const el=document.createElement('div'); el.className='cart-item';
+    el.innerHTML=`<div><div style="font-weight:700">${i.qtd}x ${i.nome}</div></div>
+      <div><button class="qtybtn" onclick="atualizar('${escapeHtml(i.nome)}',-1)">-</button>
+      <button class="qtybtn" onclick="atualizar('${escapeHtml(i.nome)}',1)">+</button></div>`;
+    cartList.appendChild(el);
+  });
+  document.getElementById('totalPreview').innerText=total.toFixed(2);
+  document.getElementById('totalQty').innerText=qty;
+}
+
+function togglePreview(){
+  const p=document.getElementById('cartPreview'), o=document.getElementById('overlay');
+  if(p.classList.contains('show')){ p.classList.remove('show'); o.classList.remove('show'); document.body.style.overflow=''; }
+  else{ p.classList.add('show'); o.classList.add('show'); document.body.style.overflow='hidden'; }
+}
+
+function clearCart(){ carrinho=[]; renderCart(); }
+
+function finalizar(){
+  if(carrinho.length===0){ alert('Carrinho vazio!'); return; }
+  let msg='Olá, gostaria de fazer um pedido:%0A'; let total=0;
+  carrinho.forEach(i=>{ msg+=`- ${i.qtd}x ${i.nome}%0A`; total+=i.preco*i.qtd; });
+  msg+=`Total mostrado no site: R$ ${total.toFixed(2)}`;
+  const numero='5585986594861';
+  window.open(`https://wa.me/${numero}?text=${msg}`,'_blank');
+}
+
+// busca simples
+document.getElementById('search').addEventListener('input', e=>{
+  const q=e.target.value.toLowerCase().trim();
+  const filtered=produtos.filter(p=>p.nome.toLowerCase().includes(q));
+  renderCatalog(filtered);
+});
+
+// SWIPE para fechar
+let startX=0,currentX=0,isDragging=false;
+const cartPreview=document.getElementById('cartPreview');
+cartPreview.addEventListener('touchstart', e=>{ if(!cartPreview.classList.contains('show')) return; isDragging=true; startX=e.touches[0].clientX; });
+cartPreview.addEventListener('touchmove', e=>{ if(!isDragging) return; currentX=e.touches[0].clientX; const deltaX=currentX-startX; if(deltaX<0) cartPreview.style.transform=`translateX(${deltaX}px)`; });
+cartPreview.addEventListener('touchend', e=>{ if(!isDragging) return; isDragging=false; const deltaX=currentX-startX; if(deltaX<-100){ togglePreview(); cartPreview.style.transform='translateX(20px)'; }else cartPreview.style.transform='translateX(0)'; });
+
+load();
+</script>
+</body>
+</html>
